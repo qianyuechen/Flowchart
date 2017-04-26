@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flowchart</title>
+<meta name="description" content="Interactive flowchart diagram implemented by GoJS in JavaScript for HTML." />
+<!-- Copyright 1998-2017 by Northwoods Software Corporation. -->
+<meta charset="UTF-8">
+  <!--[if lt IE 9]>
+<![endif]-->
+ <!-- <script type="text/javascript" src="excanvas.js"></script> -->
+
+<!--<script src="https://cdn.bootcss.com/html5shiv/r29/html5.min.js"></script> -->
+<script src="https://cdn.bootcss.com/gojs/1.6.24/go.js"></script>
+<!--<script src="go.js"></script>-->
+<style>
+
+* {
+  box-sizing: border-box;
+  /*transition: 0.5s; */
+}
+#List li {
+    background-color: lightblue;
+  }
+button {
+    background-color: rgb(0, 125, 184); /* Green */
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    font-size: 16px;
+    margin:  auto;
+    vertical-align: bottom;
+    position: relative;
+    top :35%;
+    /*height: 30%;*/
+}
+
+</style>
+<script>
+
+
+
+  var nodeArray = [];
+  var linksArray = [];
+  function init() {
+
+    var $ = go.GraphObject.make;  // for conciseness in defining templates
+
+    myDiagram =
+      $(go.Diagram, "myDiagramDiv",  // must name or refer to the DIV HTML element
+        {
+          initialContentAlignment: go.Spot.Center,
+          allowDrop: false,  // must be true to accept drops from the Palette
+          "LinkDrawn": showLinkLabel,  // this DiagramEvent listener is defined below
+          "LinkRelinked": showLinkLabel,
+          "animationManager.duration": 800, // slightly longer than default (600ms) animation
+          "undoManager.isEnabled": true, // enable undo & redo
+          //isReadOnly: true,
+          defaultCursor: "not-allowed"
+
+        });
+
+    // when the document is modified, add a "*" to the title and enable the "Save" button
+    myDiagram.addDiagramListener("Modified", function(e) {
+      var button = document.getElementById("SaveButton");
+      if (button) button.disabled = !myDiagram.isModified;
+      var idx = document.title.indexOf("*");
+      if (myDiagram.isModified) {
+        if (idx < 0) document.title += "*";
+      } else {
+        if (idx >= 0) document.title = document.title.substr(0, idx);
+      }
+    });
+
+    // helper definitions for node templates
+
+    function nodeStyle() {
+      return [
+        // The Node.location comes from the "loc" property of the node data,
+        // converted by the Point.parse static method.
+        // If the Node.location is changed, it updates the "loc" property of the node data,
+        // converting back using the Point.stringify static method.
+        new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+        {
+          // the Node.location is at the center of each node
+          locationSpot: go.Spot.Center,
+          //isShadowed: true,
+          //shadowColor: "#888",
+          // handle mouse enter/leave events to show/hide the ports
+          mouseEnter: function (e, obj) { showPorts(obj.part, true); },
+          mouseLeave: function (e, obj) { showPorts(obj.part, false); }
+        }
+      ];
+    }
+
+    // Define a function for creating a "port" that is normally transparent.
+    // The "name" is used as the GraphObject.portId, the "spot" is used to control how links connect
+    // and where the port is positioned on the node, and the boolean "output" and "input" arguments
+    // control whether the user can draw links from or to the port.
+    function makePort(name, spot, output, input) {
+      // the port is basically just a small circle that has a white stroke when it is made visible
+      return $(go.Shape, "Circle",
+               {
+
+                  fill: "transparent",
+                  stroke: null,  // this is changed to "white" in the showPorts function
+                  desiredSize: new go.Size(8, 8),
+                  alignment: spot, alignmentFocus: spot,  // align the port on the main Shape
+                  portId: name,  // declare this object to be a "port"
+                  fromSpot: spot, toSpot: spot,  // declare where links may connect at this port
+                  fromLinkable: output, toLinkable: input,  // declare whether the user may draw links to/from here
+                  cursor: "pointer"  // show a different cursor to indicate potential link point
+               });
+    }
+
+    // define the Node templates for regular nodes
+
+    var lightText = "white";
+    var deepColor = "#808080";
+
+
+
+
+function hilightnodeArray(array) {
+
+
+  for(i=0; i<array.length ;i++)
+  {
+    //array[i].selectable = true;
+    array[i].findObject("BGCOLOR").fill=deepColor;
+    array[i].findObject("BGTEXT").stroke=lightText;
+    //console.log(array[i].getKey());
+
+  }
+  if(nodeArray[nodeArray.length-1]){
+    nodeArray[nodeArray.length-1].selectable = true;
+    nodeArray[nodeArray.length-1].findObject("BGCOLOR").cursor="pointer";
+    //console.log(nodeArray[nodeArray.length-1].findObject("BGCOLOR").cursor);
+    nodeArray[nodeArray.length-1].findObject("BGTEXT").cursor="pointer";
+    nodeArray[nodeArray.length-1].findNodesOutOf().each(function(n) {
+    n.selectable = true;
+    n.findObject("BGCOLOR").cursor="pointer";
+    n.findObject("BGTEXT").cursor="pointer";
+  });
+}
+}
+
+
+
+//function (){
+//  var a=v.lf(Object.getPrototypeOf(this))+"#"+v.Kd(this);
+//null!==this.data&&(a+="("+Pf(this.data)+")");
+//return a}
+
+function hilightlinkArray(links) {
+
+
+  for(i=0; i<links.length ;i++)
+  {
+    //array[i].selectable = true;
+    //links[i].findObject("HIGHLIGHT").stroke="rgb(255, 153, 51)";
+    links[i].findObject("HIGHLIGHT").stroke=deepColor;
+    console.log(i);
+    //links[i].findObject("BGTEXT").stroke="#00A9C9";
+    //console.log(links[i].findObject("HIGHLIGHT").stroke);
+
+  }
+
+
+}
+
+
+
+   function highlightBG(e,obj) {
+
+
+  var conclusionlist=document.getElementById("List");
+  var child = document.createElement("li");
+  var shape=obj.findObject("BGCOLOR");
+  //console.log(obj.data.category);
+  var text=obj.findObject("BGTEXT");
+
+
+//  myDiagram.nodes.iterator.each(function(n){n.setProperties({
+//    selectable: false
+//  })} );
+
+  myDiagram.nodes.iterator.each(function(n){
+
+    n.selectable= obj===n?true:false;
+    n.findObject("BGCOLOR").cursor= obj===n?"pointer":"not-allowed";
+    n.findObject("BGTEXT").cursor= obj===n?"pointer":"not-allowed";
+    }) ;
+  myDiagram.links.iterator.each(function(l){
+    l.findObject("HIGHLIGHT").stroke= "transparent";
+    }) ;
+  //obj.selectable = true;
+  //shape.cursor="pointer";
+  //text.cursor="pointer";
+  //console.log(shape.cursor);
+    //console.log(n.selectable);
+
+    //n.selectable = "false"; });
+
+switch(obj.data.category) {
+  case "Condition":
+  case "Step":
+
+
+
+//  if(shape.fill=="#00A9C9"||shape.fill=="#DC3C00"||shape.fill=="#cc00cc") {
+
+
+
+
+if(shape.fill==lightText) {
+  //console.log(nodeArray[nodeArray.length-1].toString());
+  //console.log(nodeArray.length);
+  //for(i=0; i<nodeArray.length ;i++)
+  //{
+  //  console.log(nodeArray[i]+" "+nodeArray[i].selectable);
+  //}
+
+  //console.log();
+  //obj.selectable = true;
+
+  //obj.findNodesOutOf().each(function(n) { n.selectable = true; });
+  obj.findNodesInto().each(function(n) {
+    //n.selectable = false;
+    //listitemstring="<li>"+n.findObject("BGTEXT").text+"</li>";
+    //console.log(conclusionlist);
+    //var child = document.createElement("li");
+    //var text = document.createTextNode(n.findObject("BGTEXT").text);
+    //var childitem = child.appendChild(text);
+    child.innerHTML = n.findObject("BGTEXT").text;
+    //console.log(n.selectable);
+    //conclusionlist.appendChild(child);
+  });
+
+    //console.log(obj.findLinksInto());
+  obj.findLinksInto().each(function(l) {
+    if(l.fromNode.findObject("BGCOLOR").fill==deepColor||l.fromNode.data.category=="Start")
+    {
+      linksArray.push(l);
+      //l.findObject("HIGHLIGHT").stroke="rgb(255, 153, 51)";
+      child.innerHTML += (l.findObject("BGTEXT").text? " - "+l.findObject("BGTEXT").text:"");
+      //console.log(l.findObject("BGTEXT").text);
+    }
+
+      });
+    //console.log(shape.fill);
+
+  conclusionlist.appendChild(child);
+
+
+
+  nodeArray.push(obj);
+  hilightnodeArray(nodeArray);
+  hilightlinkArray(linksArray);
+    //listitemstring="<li>"+n.findObject("BGTEXT").text+"</li>";
+    //console.log(conclusionlist);
+    //var child = document.createElement("li");
+    //var text = document.createTextNode(n.findObject("BGTEXT").text);
+    //var childitem = child.appendChild(text);
+    //child.innerHTML = n.findObject("BGTEXT").text;
+    //console.log(child);
+    //conclusionlist.appendChild(child);
+
+
+
+  //shape.fill="#ffff00";
+  //text.stroke="#00A9C9";
+  //var Summaryarea=document.getElementById('mySummary');
+  //console.log(Summaryarea.textContent);
+  //Summaryarea.textContent+=text.text+"\r\n";
+  //console.log(1);
+
+}
+
+else {
+
+  //linksArray.pop()
+  obj.findLinksInto().each(function(l) {
+    if(l.fromNode.findObject("BGCOLOR").fill==deepColor||l.fromNode.data.category=="Start")
+    {
+      linksArray.pop();
+      //l.findObject("HIGHLIGHT").stroke="rgb(255, 153, 51)";
+      //child.innerHTML += (l.findObject("BGTEXT").text? " - "+l.findObject("BGTEXT").text:"");
+      //console.log(l.findObject("BGTEXT").text);
+    }});
+
+  //obj.findLinksOutOf().each(function(l) { l.findObject("HIGHLIGHT").stroke="transparent"});
+  //obj.findNodesOutOf().each(function(n) { n.selectable = false});
+  //obj.findNodesInto().each(function(n) {
+  //  n.selectable = true;
+  //  n.findNodesOutOf().each(function(n) { n.selectable = true; });
+  //});
+//    if(shape.fill=="#DC3C00"||shape.fill=="#cc00cc") {
+//    var endchild = document.createElement("li");
+//    endchild.innerHTML += obj.findObject("BGTEXT").text;
+//
+ //   conclusionlist.appendChild(endchild);
+//console.log(shape.fill);
+  //}
+  nodeArray.pop();
+  hilightnodeArray(nodeArray);
+  hilightlinkArray(linksArray);
+
+
+  conclusionlist.removeChild(conclusionlist.lastChild);
+
+  shape.fill=lightText;
+  text.stroke=deepColor;
+
+
+  }
+
+
+
+
+
+
+
+  break;
+
+  case "Start": obj.findNodesOutOf().each(function(n) {
+    n.selectable = true;
+    n.findObject("BGCOLOR").cursor="pointer";
+  //console.log(nodeArray[nodeArray.length-1].findObject("BGCOLOR").cursor);
+    n.findObject("BGTEXT").cursor="pointer";
+    //console.log("start section");
+    });
+    obj.findObject("BGCOLOR").fill=deepColor;
+    obj.findObject("BGTEXT").stroke=lightText;
+    break;
+  case "SubProcess":
+  case "End":
+  //console.log(shape.fill);
+if(shape.fill==lightText) {
+  //console.log(1);
+  //console.log(nodeArray[nodeArray.length-1].toString());
+  //console.log(nodeArray.length);
+  //for(i=0; i<nodeArray.length ;i++)
+  //{
+  //  console.log(nodeArray[i]+" "+nodeArray[i].selectable);
+  //}
+
+  //console.log(shape.fill);
+  //obj.selectable = true;
+
+  //obj.findNodesOutOf().each(function(n) { n.selectable = true; });
+  obj.findNodesInto().each(function(n) {
+    //n.selectable = false;
+    //listitemstring="<li>"+n.findObject("BGTEXT").text+"</li>";
+    //console.log(conclusionlist);
+    //var child = document.createElement("li");
+    //var text = document.createTextNode(n.findObject("BGTEXT").text);
+    //var childitem = child.appendChild(text);
+    child.innerHTML = n.findObject("BGTEXT").text;
+    //console.log(n.selectable);
+    //conclusionlist.appendChild(child);
+  });
+
+    //console.log(obj.findLinksInto());
+  obj.findLinksInto().each(function(l) {
+    if(l.fromNode.findObject("BGCOLOR").fill==deepColor||l.fromNode.data.category=="Start")
+    {
+      linksArray.push(l);
+      //l.findObject("HIGHLIGHT").stroke="rgb(255, 153, 51)";
+      child.innerHTML += (l.findObject("BGTEXT").text? " - "+l.findObject("BGTEXT").text:"");
+      //console.log(l.findObject("BGTEXT").text);
+    }
+
+      });
+    //console.log(shape.fill);
+   // if(shape.fill=="#DC3C00"||shape.fill=="#cc00cc") {
+    var endchild = document.createElement("li");
+    endchild.innerHTML += obj.findObject("BGTEXT").text;
+
+
+   // }
+  conclusionlist.appendChild(child);
+  conclusionlist.appendChild(endchild);
+
+
+
+
+
+  nodeArray.push(obj);
+  hilightnodeArray(nodeArray);
+  hilightlinkArray(linksArray);
+    //listitemstring="<li>"+n.findObject("BGTEXT").text+"</li>";
+    //console.log(conclusionlist);
+    //var child = document.createElement("li");
+    //var text = document.createTextNode(n.findObject("BGTEXT").text);
+    //var childitem = child.appendChild(text);
+    //child.innerHTML = n.findObject("BGTEXT").text;
+    //console.log(child);
+    //conclusionlist.appendChild(child);
+
+
+
+  //shape.fill="#ffff00";
+  //text.stroke="#00A9C9";
+  //var Summaryarea=document.getElementById('mySummary');
+  //console.log(Summaryarea.textContent);
+  //Summaryarea.textContent+=text.text+"\r\n";
+  //console.log(1);
+
+}
+
+else {
+
+  //linksArray.pop()
+  obj.findLinksInto().each(function(l) {
+    if(l.fromNode.findObject("BGCOLOR").fill==deepColor||l.fromNode.data.category=="Start")
+    {
+      linksArray.pop();
+      //l.findObject("HIGHLIGHT").stroke="rgb(255, 153, 51)";
+      //child.innerHTML += (l.findObject("BGTEXT").text? " - "+l.findObject("BGTEXT").text:"");
+      //console.log(l.findObject("BGTEXT").text);
+    }});
+  //console.log(shape.fill);
+  //obj.findLinksOutOf().each(function(l) { l.findObject("HIGHLIGHT").stroke="transparent"});
+  //obj.findNodesOutOf().each(function(n) { n.selectable = false});
+  //obj.findNodesInto().each(function(n) {
+  //  n.selectable = true;
+  //  n.findNodesOutOf().each(function(n) { n.selectable = true; });
+  //});
+//    if(shape.fill=="#DC3C00"||shape.fill=="#cc00cc") {
+//    var endchild = document.createElement("li");
+//    endchild.innerHTML += obj.findObject("BGTEXT").text;
+//
+ //   conclusionlist.appendChild(endchild);
+
+  //}
+  nodeArray.pop(obj);
+  hilightnodeArray(nodeArray);
+  hilightlinkArray(linksArray);
+
+
+  conclusionlist.removeChild(conclusionlist.lastChild);
+  conclusionlist.removeChild(conclusionlist.lastChild);
+
+
+  shape.fill=lightText;
+  text.stroke=deepColor;
+/*
+  if(obj.data.category==="End")
+  {
+    shape.fill=deepColor;
+    text.stroke=lightText;
+
+  }
+  else if(obj.data.category==="SubProcess"){
+  shape.fill=deepColor;
+  text.stroke=lightText;
+  }
+*/
+
+
+  }
+  break;
+
+
+
+  default:
+
+  }
+
+
+
+
+
+
+}
+    myDiagram.nodeTemplateMap.add("Step",  // the step category
+      $(go.Node, "Spot", nodeStyle(),
+        {
+          selectionAdorned: false,
+          selectable: false,
+          //mouseEnter: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=deepColor:{};
+          //},
+          //mouseLeave: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=null:{};},
+          click: function(e, node) { return node.selectable ? highlightBG(e,node) : {}; }
+        },
+        // the main object is a Panel that surrounds a TextBlock with a rectangular Shape
+        $(go.Panel, "Auto",
+        $(go.Shape, "Rectangle",
+          { fill: lightText, stroke: deepColor,strokeWidth: 2, name: "BGCOLOR" },
+          new go.Binding("figure", "figure")),
+          $(go.TextBlock,
+            {
+              font: "bold 11pt Helvetica, Arial, sans-serif",
+              stroke: deepColor,
+              margin: 8,
+              maxSize: new go.Size(80, NaN),
+              //wrap: go.TextBlock.WrapFit,
+              editable: true,
+              name: "BGTEXT"
+
+            },
+            new go.Binding("text").makeTwoWay())
+        ),
+        // four named ports, one on each side:
+        makePort("T", go.Spot.Top, true, true),
+        makePort("L", go.Spot.Left, true, true),
+        makePort("R", go.Spot.Right, true, true),
+        makePort("B", go.Spot.Bottom, true, true)
+      ));
+
+    myDiagram.nodeTemplateMap.add("Condition",  // the condition category
+      $(go.Node, "Spot", nodeStyle(),
+        {
+          selectionAdorned: false,
+          selectable: false,
+          //mouseEnter: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=deepColor:{};
+          //},
+          //mouseLeave: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=null:{};},
+          click: function(e, node) { return node.selectable ? highlightBG(e,node) : {}; }
+        },
+        // the main object is a Panel that surrounds a TextBlock with a rectangular Shape
+        $(go.Panel, "Auto",
+        $(go.Shape, "Diamond",
+          { fill: lightText, stroke: deepColor,strokeWidth: 2, name: "BGCOLOR" },
+          new go.Binding("figure", "figure")),
+          $(go.TextBlock,
+            {
+              font: "bold 11pt Helvetica, Arial, sans-serif",
+              stroke: deepColor,
+              margin: 8,
+              maxSize: new go.Size(80, NaN),
+              //wrap: go.TextBlock.WrapFit,
+              editable: true,
+              name: "BGTEXT"
+
+            },
+            new go.Binding("text").makeTwoWay())
+        ),
+        // four named ports, one on each side:
+        makePort("T", go.Spot.Top, true, true),
+        makePort("L", go.Spot.Left, true, true),
+        makePort("R", go.Spot.Right, true, true),
+        makePort("B", go.Spot.Bottom, true, true)
+      ));
+
+
+
+
+    myDiagram.nodeTemplateMap.add("Start",
+      $(go.Node, "Spot", nodeStyle(),
+        {
+          selectionAdorned: false,
+          selectable: true,
+          //mouseEnter: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=deepColor:{};
+          //},
+          //mouseLeave: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=null:{};},
+          click: function(e, node) { return node.selectable ? highlightBG(e,node) : {}; }
+        },
+        $(go.Panel, "Auto",
+          $(go.Shape, "RoundedRectangle",
+            { minSize: new go.Size(40, 40), fill: lightText, stroke: deepColor,strokeWidth: 2, name: "BGCOLOR",cursor: "pointer" }),
+          $(go.TextBlock, "Start",
+            { font: "bold 11pt Helvetica, Arial, sans-serif", stroke: deepColor,editable: true, name: "BGTEXT",cursor: "pointer" },
+            new go.Binding("text").makeTwoWay())
+        ),
+        // three named ports, one on each side except the top, all output only:
+        //makePort("L", go.Spot.Left, true, false),
+        //makePort("R", go.Spot.Right, true, false),
+        makePort("B", go.Spot.Bottom, true, false)
+      ));
+
+    myDiagram.nodeTemplateMap.add("End",
+      $(go.Node, "Spot", nodeStyle(),
+        {
+          selectionAdorned: false,
+          selectable: false,
+          //mouseEnter: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=deepColor:{};
+          //},
+          //mouseLeave: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=null:{};},
+          click: function(e, node) { return node.selectable ? highlightBG(e,node) : {}; }
+        },
+        $(go.Panel, "Auto",
+          $(go.Shape, "RoundedRectangle",
+            { minSize: new go.Size(40, 40), fill: lightText, stroke: deepColor,strokeWidth: 2, name: "BGCOLOR" }),
+          $(go.TextBlock, "End",
+            { font: "bold 11pt Helvetica, Arial, sans-serif", stroke: deepColor ,editable: true , name: "BGTEXT"},
+            new go.Binding("text").makeTwoWay())
+        ),
+        // three named ports, one on each side except the bottom, all input only:
+        makePort("T", go.Spot.Top, false, true),
+        makePort("L", go.Spot.Left, false, true),
+        makePort("R", go.Spot.Right, false, true),
+        makePort("B", go.Spot.Bottom, false, true)
+      ));
+
+      myDiagram.nodeTemplateMap.add("SubProcess",
+        $(go.Node, "Spot", nodeStyle(),
+          {
+          selectionAdorned: false,
+          selectable: false,
+          //mouseEnter: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=deepColor:{};
+          //},
+          //mouseLeave: function (e,node) { node.selectable? node.findObject("BGCOLOR").stroke=null:{};},
+          click: function(e, node) { return node.selectable ? highlightBG(e,node) : {}; }
+          },
+          $(go.Panel, "Auto",
+            $(go.Shape, "Procedure",
+              { minSize: new go.Size(40, 40), fill: lightText, stroke: deepColor,strokeWidth: 2, name: "BGCOLOR" }),
+            $(go.TextBlock, "SubProcess",
+              { font: "bold 11pt Helvetica, Arial, sans-serif", stroke: deepColor  ,editable: true, name: "BGTEXT" },
+              new go.Binding("text").makeTwoWay())
+          ),
+          // three named ports, one on each side except the bottom, all input only:
+          makePort("T", go.Spot.Top, false, true),
+          makePort("L", go.Spot.Left, false, true),
+          makePort("R", go.Spot.Right, false, true),
+          makePort("B", go.Spot.Bottom, false, true)
+        ));
+/*
+    myDiagram.nodeTemplateMap.add("Comment",
+      $(go.Node, "Auto", nodeStyle(),
+        $(go.Shape, "File",
+          { fill: "#EFFAB4", stroke: null }),
+        $(go.TextBlock,
+          {
+            margin: 5,
+            maxSize: new go.Size(200, NaN),
+            wrap: go.TextBlock.WrapFit,
+            textAlign: "center",
+            editable: true,
+            font: "bold 12pt Helvetica, Arial, sans-serif",
+            stroke: '#454545'
+          },
+          new go.Binding("text").makeTwoWay())
+        // no ports, because no links are allowed to connect with a comment
+      ));
+*/
+
+    // replace the default Link template in the linkTemplateMap
+    myDiagram.linkTemplate =
+      $(go.Link,  // the whole link panel
+        {
+          routing: go.Link.AvoidsNodes,
+          curve: go.Link.JumpOver,
+          corner: 5, toShortLength: 4,
+          relinkableFrom: true,
+          relinkableTo: true,
+          reshapable: true,
+          resegmentable: true,
+          selectionAdorned: false
+          // mouse-overs subtly highlight links:
+          //mouseEnter: function(e, link) { link.findObject("HIGHLIGHT").stroke = "rgba(30,144,255,0.2)"; },
+          //mouseLeave: function(e, link) { link.findObject("HIGHLIGHT").stroke = "transparent"; }
+        },
+        new go.Binding("points").makeTwoWay(),
+        $(go.Shape,  // the highlight shape, normally transparent
+          { isPanelMain: true, strokeWidth: 8, stroke: "transparent", name: "HIGHLIGHT" }),
+        $(go.Shape,  // the link path shape
+          { isPanelMain: true, stroke: "gray", strokeWidth: 2 }),
+        $(go.Shape,  // the arrowhead
+          { toArrow: "standard", stroke: null, fill: "gray"}),
+        $(go.Panel, "Auto",  // the link label, normally not visible
+          { visible: false, name: "LABEL", segmentIndex: 2, segmentFraction: 0.5},
+          new go.Binding("visible", "visible").makeTwoWay(),
+          $(go.Shape, "RoundedRectangle",  // the label shape
+            { fill: lightText, stroke: null }),
+          $(go.TextBlock, "",  // the label
+            {
+              textAlign: "center",
+              font: "10pt helvetica, arial, sans-serif",
+              stroke: deepColor,
+              editable: true,
+              name : "BGTEXT",
+              minSize: new go.Size(30, 10)
+            },
+            new go.Binding("text").makeTwoWay())
+        )
+      );
+
+    // Make link labels visible if coming out of a "conditional" node.
+    // This listener is called by the "LinkDrawn" and "LinkRelinked" DiagramEvents.
+    function showLinkLabel(e) {
+      var label = e.subject.findObject("LABEL");
+      if (label !== null) label.visible = (e.subject.fromNode.data.figure === "Diamond");
+    }
+
+    // temporary links used by LinkingTool and RelinkingTool are also orthogonal:
+    myDiagram.toolManager.linkingTool.temporaryLink.routing = go.Link.Orthogonal;
+    myDiagram.toolManager.relinkingTool.temporaryLink.routing = go.Link.Orthogonal;
+
+    load();  // load an initial diagram from some JSON text
+
+    // initialize the Palette that is on the left side of the page
+
+    myPalette =
+      $(go.Palette, "myPaletteDiv",  // must name or refer to the DIV HTML element
+        {
+          "animationManager.duration": 800, // slightly longer than default (600ms) animation
+          nodeTemplateMap: myDiagram.nodeTemplateMap,  // share the templates used by myDiagram
+          model: new go.GraphLinksModel([  // specify the contents of the Palette
+            { category: "Start", text: "Start" },
+            { category: "Step", text: "Step" },
+            { category: "Condition", text: "Condition" },
+            { category: "SubProcess", text: "SubProcess" },
+            { category: "End", text: "End" },
+
+          ])
+        });
+
+    // The following code overrides GoJS focus to stop the browser from scrolling
+    // the page when either the Diagram or Palette are clicked or dragged onto.
+
+    function customFocus() {
+      var x = window.scrollX || window.pageXOffset;
+      var y = window.scrollY || window.pageYOffset;
+      go.Diagram.prototype.doFocus.call(this);
+      window.scrollTo(x, y);
+    }
+
+    myDiagram.doFocus = customFocus;
+    //myPalette.doFocus = customFocus;
+
+
+  } // end init
+
+
+
+  // Make all ports on a node visible when the mouse is over the node
+  function showPorts(node, show) {
+    var diagram = node.diagram;
+    if (!diagram || diagram.isReadOnly || !diagram.allowLink) return;
+    node.ports.each(function(port) {
+        port.stroke = (show ? "white" : null);
+      });
+  }
+
+
+  // Show the diagram's model in JSON format that the user may edit
+  function save() {
+    document.getElementById("mySavedModel").value = myDiagram.model.toJson();
+    myDiagram.isModified = false;
+  }
+  function load() {
+    myDiagram.model = go.Model.fromJson(document.getElementById("mySavedModel").value);
+  }
+
+  // add an SVG rendering of the diagram at the end of this page
+  function makeSVG() {
+    var svg = myDiagram.makeSvg({
+        scale: 1      });
+    svg.style.border = "1px solid black";
+    obj = document.getElementById("SVGArea");
+    obj.appendChild(svg);
+    if (obj.children.length > 0) {
+      obj.replaceChild(svg, obj.children[0]);
+    }
+  }
+
+function checkToCopy() {
+  var count=0;
+  for (var i = nodeArray.length - 1; i >= 0; i--) {
+     if(nodeArray[i].data.category==="SubProcess"||nodeArray[i].data.category==="End")
+     {
+      count+=1;
+     }
+  };
+  if(count>=1) {
+    console.log(1);
+    CopyToClipboard();
+  }
+  else
+  {
+     alert("Please complete the process");
+    //break;
+  }
+
+}
+
+
+
+function CopyToClipboard () {
+            //checknode();
+            var copystring_Raw ="";
+            var list = document.getElementById("List");
+            for (var i = 0 ; i< list.childNodes.length; i++) {
+              copystring_Raw += ">>>"+list.childNodes[i].innerHTML+"\r\n";
+              console.log(list.childNodes[i].innerHTML);
+            };
+            //var copystring_Raw = document.getElementById("List");
+            //console.log(copystring_Raw);
+            var textToClipboard = copystring_Raw;
+
+            var success = true;
+            if (window.clipboardData) { // Internet Explorer
+                window.clipboardData.setData ("Text", textToClipboard);
+            }
+            else {
+                    // create a temporary element for the execCommand method
+                var forExecElement = CreateElementForExecCommand (textToClipboard);
+
+                        /* Select the contents of the element
+                            (the execCommand for 'copy' method works on the selection) */
+                SelectContent (forExecElement);
+
+                var supported = true;
+
+                    // UniversalXPConnect privilege is required for clipboard access in Firefox
+                try {
+                    if (window.netscape && netscape.security) {
+                        netscape.security.PrivilegeManager.enablePrivilege ("UniversalXPConnect");
+                    }
+
+                        // Copy the selected content to the clipboard
+                        // Works in Firefox and in Safari before version 5
+                    success = document.execCommand ("copy", false, null);
+                }
+                catch (e) {
+                    success = false;
+                }
+
+                    // remove the temporary element
+                document.body.removeChild (forExecElement);
+            }
+
+            if (success) {
+                //alert ("The text is on the clipboard, try to paste it!");
+            }
+            else {
+                alert ("Your browser doesn't allow clipboard access!");
+            }
+
+            //document.getElementById ("btnSearch").click();
+        }
+
+        function CreateElementForExecCommand (textToClipboard) {
+            var forExecElement = document.createElement ("div");
+                // place outside the visible area
+            forExecElement.style.position = "absolute";
+            forExecElement.style.left = "-10000px";
+            forExecElement.style.top = "-10000px";
+                // write the necessary text into the element and append to the document
+            forExecElement.textContent = textToClipboard;
+            document.body.appendChild (forExecElement);
+                // the contentEditable mode is necessary for the  execCommand method in Firefox
+            forExecElement.contentEditable = true;
+
+            return forExecElement;
+        }
+
+        function SelectContent (element) {
+                // first create a range
+            var rangeToSelect = document.createRange ();
+            rangeToSelect.selectNodeContents (element);
+
+                // select the contents
+            var selection = window.getSelection ();
+            selection.removeAllRanges ();
+            selection.addRange (rangeToSelect);
+        }
+
+
+
+</script>
+</head>
+<body onload="init()">
+<div>
+
+  <div style="width:100%;box-sizing: border-box;">
+    <span style="display: inline-block; vertical-align: top; width:10%; box-sizing: border-box;">
+      <div id="myPaletteDiv" style="border: solid 1px black; height: 720px"></div>
+    </span>
+
+    <span style="display: inline-block; vertical-align: top; width:70%; box-sizing: border-box;">
+      <div id="myDiagramDiv" style="border: solid 1px black;height: 720px"></div>
+    </span>
+    <span style="display: inline-block; vertical-align: top; width:18%; box-sizing: border-box;">
+      <div id="button" style="border: solid 1px black; height: 200px;">
+      <button onClick="checkToCopy()">Copy</button>
+      </div>
+      <div id="Summaryarea" style="border: solid 1px black; height: 520px">
+        <ul id="List"></ul>
+      </div>
+
+    </span>
+
+  </div>
+
+<!--
+  <p>
+  Mouse-over a Node to view its ports.
+  Drag from these ports to create new Links.
+  Selecting Links allows you to re-shape and re-link them.
+  Selecting a Node and then clicking its TextBlock will allow
+  you to edit text (except on the Start and End Nodes).
+  </p>
+  <button id="SaveButton" onclick="save()">Save</button>
+  <button onclick="load()">Load</button>
+
+  完成后，点击SAVE,生成代码，复制这个代码，点击load就能加载相应的图形。Diagram Model saved in JSON format:
+-->
+  <textarea id="mySavedModel" style="width:100%;height:300px;display: none;">
+{ "class": "go.GraphLinksModel",
+  "linkFromPortIdProperty": "fromPort",
+  "linkToPortIdProperty": "toPort",
+  "nodeDataArray": [
+{"category":"Start", "text":"Adapter Issue", "key":-1, "loc":"620.7968750000002 372"},
+{"category":"Condition", "text":"检查AC是否物损", "figure":"Diamond", "key":-3, "loc":"620.796875 471"},
+{"category":"Condition", "text":"AC灯亮", "figure":"Diamond", "key":-5, "loc":"618.7968749999999 600.9999999999999"},
+{"category":"Step", "text":"将AC从笔记本上移除，重新拔插AC电源线，更换插座", "key":-6, "loc":"834.796875 598"},
+{"category":"Condition", "text":"AC灯亮", "figure":"Diamond", "key":-7, "loc":"1039.796875 598.0000000000002"},
+{"category":"Condition", "text":"AC灯重新接入笔记本是否亮", "figure":"Diamond", "key":-8, "loc":"1268.7968750000005 599.0000000000002"},
+{"category":"Condition", "text":"移除外设并释放静电是否解决", "figure":"Diamond", "key":-9, "loc":"1503.7968749999995 598.0000000000002"},
+{"category":"End", "text":"派主板", "key":-11, "loc":"1502.7968749999993 746.0000000000003"},
+{"category":"Condition", "text":"交换适配器电源线正常", "figure":"Diamond", "key":-13, "loc":"1040.796875 742.0000000000002"},
+{"category":"End", "text":"派电源线", "key":-14, "loc":"835.7968749999992 742.9999999999999"},
+{"category":"End", "text":"派适配器", "key":-15, "loc":"1261.7968750000005 889.9999999999998"},
+{"category":"Condition", "text":"可以识别到正确的AC瓦数", "figure":"Diamond", "key":-16, "loc":"1041.796875 891"},
+{"category":"Step", "text":"进BIOS下查看AC和电池状态", "key":-17, "loc":"834.796875 891"},
+{"category":"Step", "text":"AC 不充电", "key":-18, "loc":"618.7968750000001 891.0000000000002"},
+{"category":"End", "text":"close", "key":-4, "loc":"1502.7968750000011 424.99999999999926"},
+{"category":"SubProcess", "text":"参考物损流程", "key":-20, "loc":"831.796875 472"},
+{"category":"SubProcess", "text":"参考电池checklist", "key":-23, "loc":"1042.796875 1052.999999999999"},
+{"category":"Step", "text":"Select Start to Continue\nand select an ending to close the process", "key":-2, "loc":"427.796875 549"}
+ ],
+  "linkDataArray": [
+{"from":-1, "to":-3, "fromPort":"B", "toPort":"T", "points":[ 620.7968750000002,392,620.7968750000002,402,620.7968750000002,407.65000000000003,620.796875,407.65000000000003,620.796875,413.30000000000007,620.796875,423.30000000000007 ]},
+{"from":-3, "to":-5, "fromPort":"B", "toPort":"T", "visible":true, "points":[ 620.796875,518.7,620.796875,528.7,620.796875,543.8,618.7968749999999,543.8,618.7968749999999,558.9,618.7968749999999,568.9 ], "text":"N"},
+{"from":-18, "to":-17, "fromPort":"R", "toPort":"L", "points":[ 662.2868576049805,891.0000000000001,672.2868576049805,891.0000000000001,724.296875,891.0000000000001,724.296875,890.9999999999999,776.3068923950195,890.9999999999999,786.3068923950195,890.9999999999999 ]},
+{"from":-17, "to":-16, "fromPort":"R", "toPort":"L", "points":[ 883.2868576049805,890.9999999999999,893.2868576049805,890.9999999999999,917.6418952941895,890.9999999999999,917.6418952941895,891.0000000000001,941.9969329833986,891.0000000000001,951.9969329833986,891.0000000000001 ]},
+{"from":-7, "to":-13, "fromPort":"B", "toPort":"T", "visible":true, "points":[ 1039.7968749999995,630.1000000000004,1039.7968749999995,640.1000000000004,1039.7968749999995,662.2000000000003,1040.7968749999998,662.2000000000003,1040.7968749999998,684.3000000000002,1040.7968749999998,694.3000000000002 ], "text":"N"},
+{"from":-5, "to":-6, "fromPort":"R", "toPort":"L", "visible":true, "points":[686.6168518066405,601,696.6168518066405,601,739.796875,601,739.796875,598,779.6469039916992,598,789.6469039916992,598], "text":"N"},
+{"from":-6, "to":-7, "fromPort":"R", "toPort":"L", "points":[ 879.9468460083008,598,889.9468460083008,598,925.9618721008299,598,925.9618721008299,598.0000000000003,961.976898193359,598.0000000000003,971.976898193359,598.0000000000003 ]},
+{"from":-7, "to":-8, "fromPort":"R", "toPort":"L", "visible":true, "points":[ 1107.6168518066402,598.0000000000003,1117.6168518066402,598.0000000000003,1143.3068923950193,598.0000000000003,1143.3068923950193,599.0000000000001,1168.9969329833984,599.0000000000001,1178.9969329833984,599.0000000000001 ], "text":"Y"},
+{"from":-8, "to":-9, "fromPort":"R", "toPort":"L", "visible":true, "points":[ 1358.5968170166016,599.0000000000001,1368.5968170166016,599.0000000000001,1386.2968749999998,599.0000000000001,1386.2968749999998,598.0000000000001,1403.996932983398,598.0000000000001,1413.996932983398,598.0000000000001 ], "text":"N"},
+{"from":-5, "to":-18, "fromPort":"B", "toPort":"T", "visible":true, "points":[ 618.7968749999999,633.1,618.7968749999999,643.1,618.7968749999999,753.9000000000001,618.796875,753.9000000000001,618.796875,864.7000000000002,618.796875,874.7000000000002 ], "text":"Y"},
+{"from":-3, "to":-20, "fromPort":"R", "toPort":"L", "visible":true, "points":[ 703.2768402099609,471.00000000000006,713.2768402099609,471.00000000000006,739.7993793487549,471.00000000000006,739.7993793487549,472.00000000000006,766.3219184875488,472.00000000000006,776.3219184875488,472.00000000000006 ], "text":"Y"},
+{"from":-16, "to":-23, "fromPort":"B", "toPort":"T", "visible":true, "points":[ 1041.796875,954.3000000000002,1041.796875,964.3000000000002,1041.796875,993.6499999999999,1042.796875,993.6499999999999,1042.796875,1022.9999999999995,1042.796875,1032.9999999999995 ], "text":"Y"},
+{"from":-13, "to":-15, "fromPort":"B", "toPort":"T", "visible":true, "points":[1040.796875,789.7000000000002,1040.796875,799.7000000000002,1040.796875,799.7000000000002,1261.7968750000005,799.7000000000002,1261.7968750000005,859.9999999999998,1261.7968750000005,869.9999999999998], "text":"Y"},
+{"from":-13, "to":-14, "fromPort":"L", "toPort":"R", "visible":true, "points":[950.9969329833984,742.0000000000002,940.9969329833984,742.0000000000002,909.687604269596,742.0000000000002,909.687604269596,742.9999999999999,878.3782755557937,742.9999999999999,868.3782755557937,742.9999999999999], "text":"Y"},
+{"from":-8, "to":-4, "fromPort":"T", "toPort":"L", "visible":true, "points":[1268.7968750000005,535.7000000000003,1268.7968750000005,525.7000000000003,1268.7968750000005,424.99999999999926,1369.9161631254237,424.99999999999926,1471.0354512508472,424.99999999999926,1481.0354512508472,424.99999999999926], "text":"Y"},
+{"from":-9, "to":-4, "fromPort":"T", "toPort":"B", "visible":true, "points":[1503.7968749999995,534.7000000000003,1503.7968749999995,524.7000000000003,1503.7968749999995,489.8499999999998,1502.7968750000011,489.8499999999998,1502.7968750000011,454.99999999999926,1502.7968750000011,444.99999999999926], "text":"Y"},
+{"from":-9, "to":-11, "fromPort":"B", "toPort":"T", "visible":true, "points":[1503.7968749999995,661.3000000000003,1503.7968749999995,671.3000000000003,1503.7968749999995,693.6500000000003,1502.7968749999993,693.6500000000003,1502.7968749999993,716.0000000000003,1502.7968749999993,726.0000000000003], "text":"N"},
+{"from":-16, "to":-15, "fromPort":"R", "toPort":"L", "visible":true, "points":[1131.5968170166016,891,1141.5968170166016,891,1180.4061457304038,891,1180.4061457304038,889.9999999999998,1219.215474444206,889.9999999999998,1229.215474444206,889.9999999999998], "text":"N"}
+ ]}
+  </textarea>
+
+<!--
+  <p>Click the button below to render the current GoJS Diagram into SVG at one-half scale.
+     The SVG is not interactive like the GoJS diagram, but can be used for printing or display.
+     For more information, see the page on <a href="../intro/makingSVG.html">making SVG</a>.</p>
+  <button onclick="makeSVG()">Render as SVG</button>
+  <div id="SVGArea"></div>
+</div>
+-->
+</body>
+</html>
